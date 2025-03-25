@@ -19,8 +19,7 @@ export const handler = async (event) => {
   const body = JSON.parse(event.body);
 
   // Extract relevant details from webhook payload
-  const terraformStatus = body.status || "success"; // Adjust based on your webhook payload
-  const customerName = body.customer_name || "unknown"; // Ensure webhook includes this field if needed
+  const terraformStatus = body.action;
 
   // Construct EventBridge event
   const params = {

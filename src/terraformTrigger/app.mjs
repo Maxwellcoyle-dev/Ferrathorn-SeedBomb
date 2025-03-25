@@ -54,7 +54,7 @@ export const handler = async (event) => {
 
   // 3. Trigger GitHub Action
   try {
-    await triggerGithubAction({
+    const triggerResult = await triggerGithubAction({
       owner: "Maxwellcoyle-dev",
       repo: "ferrathorn_provisioning_test",
       workflow_id: "terraform.yml",
@@ -65,6 +65,7 @@ export const handler = async (event) => {
       token: githubPAT,
     });
     console.log("GitHub Action successfully triggered.");
+    console.log(triggerResult);
   } catch (error) {
     console.error("Error triggering GitHub Action:", error);
     throw error;
