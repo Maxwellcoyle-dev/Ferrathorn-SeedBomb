@@ -17,7 +17,7 @@ const client = new SecretsManagerClient({
 export const handler = async (event) => {
   // 1. Pick up messages from the SeedBombProvisioningQueue (SQS).
   console.log("Received event:", event);
-  const { messageId, body, attributes } = event.Records[0].body;
+  const { messageId, body, attributes } = event.Records[0];
   console.log("Message ID:", messageId);
   console.log("Body:", body);
   console.log("Attributes:", attributes);
