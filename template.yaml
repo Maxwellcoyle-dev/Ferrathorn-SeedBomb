@@ -8,17 +8,6 @@ Parameters:
     Default: GitHubCredentials
 
 Resources:
-  ## Lambda Layer for Shared Dependencies
-
-  SeedBombSharedLayer:
-    Type: AWS::Serverless::LayerVersion
-    Properties:
-      LayerName: SeedBombSharedLayer
-      Description: Shared dependencies for SeedBomb Lambdas
-      ContentUri: layers/shared/
-      CompatibleRuntimes:
-        - nodejs20.x
-
   ## DynamoDB Tables
 
   SeedBombCustomerMetadataTable:
@@ -66,8 +55,6 @@ Resources:
     Properties:
       Runtime: nodejs20.x
       Handler: terraformTrigger.handler
-      Layers:
-        - !Ref SeedBombSharedLayer
       Policies:
         - SQSPollerPolicy:
             QueueName: !GetAtt SeedBombProvisioningQueue.QueueName
@@ -92,8 +79,6 @@ Resources:
     Properties:
       Runtime: nodejs20.x
       Handler: terraformCompletionWebhook.handler
-      Layers:
-        - !Ref SeedBombSharedLayer
       Policies:
         - EventBridgePutEventsPolicy:
             EventBusName: default
@@ -109,8 +94,6 @@ Resources:
     Properties:
       Runtime: nodejs20.x
       Handler: reactDeploymentTrigger.handler
-      Layers:
-        - !Ref SeedBombSharedLayer
       Policies:
         - Statement:
             - Effect: Allow
@@ -136,8 +119,6 @@ Resources:
     Properties:
       Runtime: nodejs20.x
       Handler: reactCompletionWebhook.handler
-      Layers:
-        - !Ref SeedBombSharedLayer
       Policies:
         - EventBridgePutEventsPolicy:
             EventBusName: default
@@ -153,8 +134,6 @@ Resources:
     Properties:
       Runtime: nodejs20.x
       Handler: deploymentFinalization.handler
-      Layers:
-        - !Ref SeedBombSharedLayer
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref SeedBombCustomerMetadataTable
