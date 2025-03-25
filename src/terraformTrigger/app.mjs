@@ -17,11 +17,10 @@ const client = new SecretsManagerClient({
 export const handler = async (event) => {
   // 1. Pick up messages from the SeedBombProvisioningQueue (SQS).
   console.log("Received event:", event);
-  const { url, method, headers, data } = JSON.parse(event.body);
-  console.log("URL:", url);
-  console.log("Method:", method);
-  console.log("Headers:", headers);
-  console.log("Data:", data);
+  const { messageId, body, attributes } = event.Records[0].body;
+  console.log("Message ID:", messageId);
+  console.log("Body:", body);
+  console.log("Attributes:", attributes);
 
   // 2. Retrieve GitHub PAT secret from AWS Secrets Manager.
   let github_pat;
