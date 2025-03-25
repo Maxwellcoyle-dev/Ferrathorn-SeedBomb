@@ -1,0 +1,48 @@
+name: Deploy SeedBomb SAM Application
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup AWS SAM CLI
+        uses: aws-actions/setup-sam@v2
+
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Lambda Layer dependencies
+        working-directory: layers/shared/nodejs
+        run: |
+          npm install
+
+      - name: Install Lambda function dependencies
+        run: |
+          for dir in src/*; do
+            if [ -f \"$dir/package.json\" ]; then
+              (cd \"$dir\" && npm install)
+            fi
+          done
+
+      - name: SAM Build
+        run: |
+          sam build --use-container
+
+      - name: SAM Deploy
+        run: |
+          sam deploy --no-confirm-changeset --no-fail-on-empty-changeset \
+            --stack-name seedbomb \
+            --capabilities CAPABILITY_IAM \
+            --region ${{ secrets.AWS_REGION }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
