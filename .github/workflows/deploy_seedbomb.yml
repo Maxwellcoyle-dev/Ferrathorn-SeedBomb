@@ -20,11 +20,6 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install Lambda Layer dependencies
-        working-directory: layers/shared/nodejs
-        run: |
-          npm install
-
       - name: Install Lambda function dependencies
         run: |
           for dir in src/*; do

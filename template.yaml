@@ -9,7 +9,6 @@ Parameters:
 
 Resources:
   ## DynamoDB Tables
-
   SeedBombCustomerMetadataTable:
     Type: AWS::DynamoDB::Table
     Properties:
