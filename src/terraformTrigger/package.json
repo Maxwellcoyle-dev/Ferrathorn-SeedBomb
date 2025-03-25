@@ -2,7 +2,8 @@
   "name": "terraformtrigger",
   "version": "1.0.0",
   "description": "",
-  "main": "terraformTrigger.mjs",
+  "main": "app.mjs",
+  "type": "module",
   "directories": {
     "test": "tests"
   },
