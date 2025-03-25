@@ -1,65 +1,109 @@
-// 1. Pick up messages from the SeedBombProvisioningQueue (SQS).
-// 2. Retrieve GitHub PAT secret from AWS Secrets Manager.
-// 3. Trigger the GitHub Action workflow to start Terraform provisioning.
-
 import axios from "axios";
 import {
   SecretsManagerClient,
   GetSecretValueCommand,
 } from "@aws-sdk/client-secrets-manager";
+import {
+  DynamoDBClient,
+  PutItemCommand,
+  GetItemCommand,
+} from "@aws-sdk/client-dynamodb";
+import { SQSClient, DeleteMessageCommand } from "@aws-sdk/client-sqs";
 
-const secret_name = "prod/GitHubCredentials";
+const awsRegion = "us-east-1";
 
-const client = new SecretsManagerClient({
-  region: "us-east-1",
-});
+// AWS Clients
+const secretsManagerClient = new SecretsManagerClient({ region: awsRegion });
+const dynamoDBClient = new DynamoDBClient({ region: awsRegion });
+const sqsClient = new SQSClient({ region: awsRegion });
+
+// Constants
+const SECRET_NAME = "prod/GitHubCredentials";
+const IDEMPOTENCY_TABLE = "SeedBombIdempotencyTable";
+const PROVISIONING_QUEUE_URL =
+  "https://sqs.us-east-1.amazonaws.com/058032684457/seedbomb-SeedBombProvisioningQueue-RAgu5BAlgjMj";
 
 export const handler = async (event) => {
-  // 1. Pick up messages from the SeedBombProvisioningQueue (SQS).
-  console.log("Received event:", event);
-  const { messageId, body, attributes } = event.Records[0];
+  const { messageId, body, receiptHandle } = event.Records[0];
   console.log("Message ID:", messageId);
   console.log("Body:", body);
-  console.log("Attributes:", attributes);
 
-  // 2. Retrieve GitHub PAT secret from AWS Secrets Manager.
-  let github_pat_payload;
+  // 1. Idempotency Check
+  const isAlreadyProcessed = await checkIdempotency(messageId);
+  if (isAlreadyProcessed) {
+    console.log(`Message ${messageId} already processed. Skipping.`);
+    await deleteMessage(receiptHandle);
+    return;
+  }
 
+  // 2. Retrieve GitHub PAT from Secrets Manager
+  let githubPAT;
   try {
-    github_pat_payload = await client.send(
-      new GetSecretValueCommand({
-        SecretId: secret_name,
-      })
+    const secretData = await secretsManagerClient.send(
+      new GetSecretValueCommand({ SecretId: SECRET_NAME })
     );
+    githubPAT = JSON.parse(secretData.SecretString).GitHubCredentials;
+    console.log("GitHub PAT retrieved.");
   } catch (error) {
+    console.error("Failed to retrieve GitHub credentials:", error);
     throw error;
   }
-  console.log("GitHub PAT:", github_pat_payload);
 
-  // Extract the GitHub PAT from the SecretString
-  const github_pat = JSON.parse(
-    github_pat_payload.SecretString
-  ).GitHubCredentials;
-  console.log("GitHub PAT:", github_pat);
+  // 3. Trigger GitHub Action
+  try {
+    await triggerGithubAction({
+      owner: "Maxwellcoyle-dev",
+      repo: "ferrathorn_provisioning_test",
+      workflow_id: "terraform.yml",
+      ref: "main",
+      inputs: {
+        customer_name: JSON.parse(body).customer_name, // dynamic customer name from message body
+      },
+      token: githubPAT,
+    });
+    console.log("GitHub Action successfully triggered.");
+  } catch (error) {
+    console.error("Error triggering GitHub Action:", error);
+    throw error;
+  }
 
-  // // 3. Trigger the GitHub Action workflow to start Terraform provisioning.
-  const response = await triggerGithubAction({
-    owner: "Maxwellcoyle-dev",
-    repo: "ferrathorn_provisioning_test",
-    workflow_id: "terraform.yml",
-    ref: "main",
-    inputs: {
-      customer_name: "ferrathorn-customer-010",
-    },
-    token: github_pat,
+  // 4. Mark message as processed (idempotency)
+  await markMessageAsProcessed(messageId);
+
+  // 5. Cleanup: Delete message from SQS
+  await deleteMessage(receiptHandle);
+};
+
+const checkIdempotency = async (messageId) => {
+  const command = new GetItemCommand({
+    TableName: IDEMPOTENCY_TABLE,
+    Key: { messageId: { S: messageId } },
   });
 
-  console.log("GitHub Action response:", response);
+  const result = await dynamoDBClient.send(command);
+  return result.Item !== undefined;
+};
 
-  return {
-    statusCode: 200,
-    body: JSON.stringify({ message: "GitHub Action triggered successfully" }),
-  };
+const markMessageAsProcessed = async (messageId) => {
+  const command = new PutItemCommand({
+    TableName: IDEMPOTENCY_TABLE,
+    Item: {
+      messageId: { S: messageId },
+      processedAt: { S: new Date().toISOString() },
+    },
+  });
+  await dynamoDBClient.send(command);
+  console.log(`Message ${messageId} marked as processed.`);
+};
+
+const deleteMessage = async (receiptHandle) => {
+  const command = new DeleteMessageCommand({
+    QueueUrl: PROVISIONING_QUEUE_URL,
+    ReceiptHandle: receiptHandle,
+  });
+
+  await sqsClient.send(command);
+  console.log(`Message deleted from SQS queue.`);
 };
 
 const triggerGithubAction = async ({
@@ -67,36 +111,26 @@ const triggerGithubAction = async ({
   repo,
   workflow_id,
   ref,
-  inputs = {},
+  inputs,
   token,
 }) => {
   const url = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflow_id}/dispatches`;
 
-  try {
-    const response = await axios.post(
-      url,
-      {
-        ref,
-        inputs,
+  const response = await axios.post(
+    url,
+    { ref, inputs },
+    {
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${token}`,
+        "X-GitHub-Api-Version": "2022-11-28",
       },
-      {
-        headers: {
-          Accept: "application/vnd.github+json",
-          Authorization: `Bearer ${token}`,
-          "X-GitHub-Api-Version": "2022-11-28",
-        },
-      }
-    );
-
-    if (response.status === 204) {
-      console.log("Workflow dispatch event triggered successfully.");
-    } else {
-      console.log(`Unexpected response status: ${response.status}`);
     }
-  } catch (error) {
-    console.error(
-      "Error triggering GitHub Action:",
-      error.response ? error.response.data : error.message
-    );
+  );
+
+  if (response.status === 204) {
+    console.log("Workflow dispatch event triggered successfully.");
+  } else {
+    console.warn(`Unexpected response status: ${response.status}`);
   }
 };

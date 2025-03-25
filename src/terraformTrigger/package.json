@@ -13,6 +13,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.775.0",
     "@aws-sdk/client-secrets-manager": "^3.774.0",
     "axios": "^1.8.4"
   }
