@@ -53,7 +53,8 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Runtime: nodejs20.x
-      Handler: terraformTrigger.handler
+      Handler: app.handler
+      CodeUri: src/terraformTrigger
       Policies:
         - SQSPollerPolicy:
             QueueName: !GetAtt SeedBombProvisioningQueue.QueueName
