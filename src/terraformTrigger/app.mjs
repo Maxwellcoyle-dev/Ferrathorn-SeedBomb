@@ -14,7 +14,7 @@ const client = new SecretsManagerClient({
   region: "us-east-1",
 });
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
   // 1. Pick up messages from the SeedBombProvisioningQueue (SQS).
   console.log("Received event:", event);
   const { url, method, headers, data } = JSON.parse(event.body);
