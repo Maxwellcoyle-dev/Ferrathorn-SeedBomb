@@ -24,6 +24,7 @@ const PROVISIONING_QUEUE_URL =
   "https://sqs.us-east-1.amazonaws.com/058032684457/seedbomb-SeedBombProvisioningQueue-RAgu5BAlgjMj";
 
 export const handler = async (event) => {
+  console.log(event);
   const { messageId, body, receiptHandle } = event.Records[0];
   console.log("Message ID:", messageId);
   console.log("Body:", body);
