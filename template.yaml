@@ -58,7 +58,7 @@ Resources:
         - SQSPollerPolicy:
             QueueName: !GetAtt SeedBombProvisioningQueue.QueueName
         - DynamoDBCrudPolicy:
-            TableName: !Ref SeedBombIdempotencyTable
+            TableName: !GetAtt SeedBombIdempotencyTable.Arn
         - Statement:
             - Effect: Allow
               Action:
