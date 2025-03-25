@@ -14,6 +14,57 @@ const client = new SecretsManagerClient({
   region: "us-east-1",
 });
 
+async function triggerGithubAction({
+  owner,
+  repo,
+  workflow_id, // either workflow file name (e.g., 'deploy.yml') or workflow ID
+  ref, // branch or tag name to run the workflow on
+  inputs = {}, // workflow inputs, if any
+  token, // GitHub Personal Access Token with appropriate permissions
+}) {
+  const url = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflow_id}/dispatches`;
+
+  try {
+    const response = await axios.post(
+      url,
+      {
+        ref,
+        inputs,
+      },
+      {
+        headers: {
+          Accept: "application/vnd.github+json",
+          Authorization: `Bearer ${token}`,
+          "X-GitHub-Api-Version": "2022-11-28",
+        },
+      }
+    );
+
+    if (response.status === 204) {
+      console.log("Workflow dispatch event triggered successfully.");
+    } else {
+      console.log(`Unexpected response status: ${response.status}`);
+    }
+  } catch (error) {
+    console.error(
+      "Error triggering GitHub Action:",
+      error.response ? error.response.data : error.message
+    );
+  }
+}
+
+// Example Usage:
+triggerGithubAction({
+  owner: "Maxwellcoyle-dev",
+  repo: "ferrathorn_provisioning_test",
+  workflow_id: "terraform.yml",
+  ref: "main",
+  inputs: {
+    customer_name: "ferrathorn-customer-01",
+  },
+  token: token, // Store your GitHub Token securely, e.g., in an environment variable
+});
+
 export const handler = async (event) => {
   // 1. Pick up messages from the SeedBombProvisioningQueue (SQS).
   console.log("Received event:", event);
@@ -37,7 +88,19 @@ export const handler = async (event) => {
   console.log("GitHub PAT:", github_pat);
 
   // // 3. Trigger the GitHub Action workflow to start Terraform provisioning.
-  // const response = await axios({ url, method, headers, data });
+  triggerGithubAction({
+    owner: "Maxwellcoyle-dev",
+    repo: "ferrathorn_provisioning_test",
+    workflow_id: "terraform.yml",
+    ref: "main",
+    inputs: {
+      customer_name: "ferrathorn-customer-010",
+    },
+    token: github_pat,
+  });
 
-  return response.data;
+  return {
+    statusCode: 200,
+    body: JSON.stringify({ message: "GitHub Action triggered successfully" }),
+  };
 };
