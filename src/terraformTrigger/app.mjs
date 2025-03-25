@@ -28,6 +28,7 @@ export const handler = async (event) => {
   const { messageId, body, receiptHandle } = event.Records[0];
   console.log("Message ID:", messageId);
   console.log("Body:", body);
+  const customerName = body;
 
   // 1. Idempotency Check
   const isAlreadyProcessed = await checkIdempotency(messageId);
@@ -58,7 +59,7 @@ export const handler = async (event) => {
       workflow_id: "terraform.yml",
       ref: "main",
       inputs: {
-        customer_name: JSON.parse(body).customer_name, // dynamic customer name from message body
+        customer_name: customerName,
       },
       token: githubPAT,
     });
