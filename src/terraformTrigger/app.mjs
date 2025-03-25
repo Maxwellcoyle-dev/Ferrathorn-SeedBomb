@@ -19,7 +19,7 @@ const sqsClient = new SQSClient({ region: awsRegion });
 
 // Constants
 const SECRET_NAME = "prod/GitHubCredentials";
-const IDEMPOTENCY_TABLE = "SeedBombIdempotencyTable";
+const IDEMPOTENCY_TABLE = "seedbomb-SeedBombIdempotencyTable-1UAB300Q5SXL7";
 const PROVISIONING_QUEUE_URL =
   "https://sqs.us-east-1.amazonaws.com/058032684457/seedbomb-SeedBombProvisioningQueue-RAgu5BAlgjMj";
 
