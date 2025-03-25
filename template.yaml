@@ -1,0 +1,173 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Ferrathorn SeedBomb - Automated Customer Infrastructure Provisioning
+
+Parameters:
+  GitHubCredentialsSecretName:
+    Type: String
+    Default: GitHubCredentials
+
+Resources:
+  ## Lambda Layer for Shared Dependencies
+
+  SeedBombSharedLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: SeedBombSharedLayer
+      Description: Shared dependencies for SeedBomb Lambdas
+      ContentUri: layers/shared/
+      CompatibleRuntimes:
+        - nodejs20.x
+
+  ## DynamoDB Tables
+
+  SeedBombCustomerMetadataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: customerId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: customerId
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  SeedBombProvisioningStatusTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: provisioningId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: provisioningId
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  SeedBombIdempotencyTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: messageId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: messageId
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  ## SQS Queue
+
+  SeedBombProvisioningQueue:
+    Type: AWS::SQS::Queue
+
+  ## Lambda Functions
+
+  SeedBombTerraformTriggerLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: nodejs20.x
+      Handler: terraformTrigger.handler
+      Layers:
+        - !Ref SeedBombSharedLayer
+      Policies:
+        - SQSPollerPolicy:
+            QueueName: !GetAtt SeedBombProvisioningQueue.QueueName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+                - secretsmanager:DescribeSecret
+              Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${GitHubCredentialsSecretName}*"
+      Environment:
+        Variables:
+          GITHUB_SECRET_NAME: !Ref GitHubCredentialsSecretName
+      Events:
+        SQSProvisioningEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt SeedBombProvisioningQueue.Arn
+            BatchSize: 1
+
+  SeedBombTerraformCompletionWebhookLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: nodejs20.x
+      Handler: terraformCompletionWebhook.handler
+      Layers:
+        - !Ref SeedBombSharedLayer
+      Policies:
+        - EventBridgePutEventsPolicy:
+            EventBusName: default
+      Events:
+        TerraformCompletionWebhook:
+          Type: Api
+          Properties:
+            Path: /terraform-complete
+            Method: post
+
+  SeedBombReactDeploymentTriggerLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: nodejs20.x
+      Handler: reactDeploymentTrigger.handler
+      Layers:
+        - !Ref SeedBombSharedLayer
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+                - secretsmanager:DescribeSecret
+              Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${GitHubCredentialsSecretName}*"
+      Environment:
+        Variables:
+          GITHUB_SECRET_NAME: !Ref GitHubCredentialsSecretName
+      Events:
+        TerraformProvisioningCompletedEvent:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source:
+                - ferrathorn.seedbomb.terraform
+              detail-type:
+                - TerraformProvisioningCompleted
+
+  SeedBombReactCompletionWebhookLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: nodejs20.x
+      Handler: reactCompletionWebhook.handler
+      Layers:
+        - !Ref SeedBombSharedLayer
+      Policies:
+        - EventBridgePutEventsPolicy:
+            EventBusName: default
+      Events:
+        ReactCompletionWebhook:
+          Type: Api
+          Properties:
+            Path: /react-deployment-complete
+            Method: post
+
+  SeedBombFinalizationLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: nodejs20.x
+      Handler: deploymentFinalization.handler
+      Layers:
+        - !Ref SeedBombSharedLayer
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SeedBombCustomerMetadataTable
+        - CloudFrontReadOnlyAccess
+      Environment:
+        Variables:
+          CUSTOMER_METADATA_TABLE: !Ref SeedBombCustomerMetadataTable
+      Events:
+        ReactDeploymentCompletedEvent:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source:
+                - ferrathorn.seedbomb.react
+              detail-type:
+                - ReactDeploymentCompleted
