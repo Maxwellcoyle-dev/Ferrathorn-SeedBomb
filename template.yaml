@@ -79,7 +79,8 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Runtime: nodejs20.x
-      Handler: terraformCompletionWebhook.handler
+      Handler: app.handler
+      CodeUri: src/terraformCompletionWebhook
       Policies:
         - EventBridgePutEventsPolicy:
             EventBusName: default

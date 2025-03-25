@@ -10,18 +10,19 @@ import {
 } from "@aws-sdk/client-dynamodb";
 import { SQSClient, DeleteMessageCommand } from "@aws-sdk/client-sqs";
 
-const awsRegion = "us-east-1";
-
-// AWS Clients
-const secretsManagerClient = new SecretsManagerClient({ region: awsRegion });
-const dynamoDBClient = new DynamoDBClient({ region: awsRegion });
-const sqsClient = new SQSClient({ region: awsRegion });
-
 // Constants
+const AWS_REGION = "us-east-1";
 const SECRET_NAME = "prod/GitHubCredentials";
 const IDEMPOTENCY_TABLE = "seedbomb-SeedBombIdempotencyTable-1UAB300Q5SXL7";
 const PROVISIONING_QUEUE_URL =
   "https://sqs.us-east-1.amazonaws.com/058032684457/seedbomb-SeedBombProvisioningQueue-RAgu5BAlgjMj";
+
+// AWS Clients
+const secretsManagerClient = new SecretsManagerClient({
+  region: AWS_REGION,
+});
+const dynamoDBClient = new DynamoDBClient({ region: AWS_REGION });
+const sqsClient = new SQSClient({ region: AWS_REGION });
 
 export const handler = async (event) => {
   console.log(event);
