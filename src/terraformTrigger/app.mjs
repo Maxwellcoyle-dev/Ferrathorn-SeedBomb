@@ -53,18 +53,6 @@ async function triggerGithubAction({
   }
 }
 
-// Example Usage:
-triggerGithubAction({
-  owner: "Maxwellcoyle-dev",
-  repo: "ferrathorn_provisioning_test",
-  workflow_id: "terraform.yml",
-  ref: "main",
-  inputs: {
-    customer_name: "ferrathorn-customer-01",
-  },
-  token: token, // Store your GitHub Token securely, e.g., in an environment variable
-});
-
 export const handler = async (event) => {
   // 1. Pick up messages from the SeedBombProvisioningQueue (SQS).
   console.log("Received event:", event);
