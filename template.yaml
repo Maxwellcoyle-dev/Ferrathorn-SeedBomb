@@ -5,7 +5,7 @@ Description: Ferrathorn SeedBomb - Automated Customer Infrastructure Provisionin
 Parameters:
   GitHubCredentialsSecretName:
     Type: String
-    Default: prod/GitHubCredentials
+    Default: prod/GitHubCredentials-Mx9sA2
 
 Resources:
   ## DynamoDB Tables
